@@ -1,0 +1,115 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+```{r}
+library("rjson")
+library("tidyverse")
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer")
+library("jsonlite")
+library("sentimentr")
+
+# Give the input file name to the function.
+result <- stream_in(file("Musical_instruments_5.json",open="r"))
+```
+
+```{r}
+df <- as.data.frame(result)
+```
+
+```{r}
+# For the positive reviews, we will consider only the ratings equal to 5
+# For the positive reviews, we will take the ratings inferior to 3
+positive <- filter(df, overall == 5)
+negative <- filter(df, overall < 3)
+
+positiveText <- positive$summary
+negativeText <- negative$summary
+
+head(positiveText)
+head(negativeText)
+
+
+```
+
+
+```{r}
+positiveDocs <- Corpus(VectorSource(positiveText))
+negativeDocs <- Corpus(VectorSource(negativeText))
+
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+
+positiveDocs <- tm_map(positiveDocs, toSpace, "/")
+positiveDocs <- tm_map(positiveDocs, toSpace, "@")
+positiveDocs <- tm_map(positiveDocs, toSpace, "\\|")
+
+negativeDocs <- tm_map(negativeDocs, toSpace, "/")
+negativeDocs <- tm_map(negativeDocs, toSpace, "@")
+negativeDocs <- tm_map(negativeDocs, toSpace, "\\|")
+
+# convert to lowercase
+positiveDocs <- tm_map(positiveDocs, content_transformer(tolower))
+# remove numbers
+positiveDocs <- tm_map(positiveDocs, removeNumbers)
+# remove stopwords
+positiveDocs <- tm_map(positiveDocs, removeWords, stopwords("english"))
+# remove punctuation
+positiveDocs <- tm_map(positiveDocs, removePunctuation)
+# remove additional empty spaces
+positiveDocs <- tm_map(positiveDocs, stripWhitespace)
+# text stemming
+# positiveDocs <- tm_map(positiveDocs, stemDocument)
+
+
+negativeDocs <- tm_map(negativeDocs, content_transformer(tolower))
+negativeDocs <- tm_map(negativeDocs, removeNumbers)
+negativeDocs <- tm_map(negativeDocs, removeWords, stopwords("english"))
+negativeDocs <- tm_map(negativeDocs, removePunctuation)
+negativeDocs <- tm_map(negativeDocs, stripWhitespace)
+# negativeDocs <- tm_map(negativeDocs, stemDocument)
+
+
+
+dtmP <- TermDocumentMatrix(positiveDocs)
+mP <- as.matrix(dtmP)
+vP <- sort(rowSums(mP),decreasing=TRUE)
+dP <- data.frame(word = names(vP),freq=vP)
+
+
+dtmN <- TermDocumentMatrix(negativeDocs)
+mN <- as.matrix(dtmN)
+vN <- sort(rowSums(mN),decreasing=TRUE)
+dN <- data.frame(word = names(vN),freq=vN)
+
+
+```
+
+```{r}
+
+barplot(dP$freq[0:10], names.arg = dP$word[0:10])
+
+set.seed(1234)
+wordcloud(words = dP$word, freq = dP$freq, min.freq = 1,
+           max.words=100, random.order=FALSE, rot.per=0.35, 
+           colors=brewer.pal(8, "Dark2"))
+
+barplot(dN$freq[0:10], names.arg = dN$word[0:10])
+
+# set.seed(1234)
+# wordcloud(words = dN$word, freq = dN$freq, min.freq = 1,
+#           max.words=100, random.order=FALSE, rot.per=0.35, 
+#           colors=brewer.pal(8, "Dark2"))
+
+```
+
+
+
+
